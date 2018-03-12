@@ -38,13 +38,13 @@ type HTTPMonitor struct {
 	Headers            map[string]string
 
 	// compiled to Regexp
-	ExpectedBody string `mapstructure:"expected_body"`
-	bodyRegexp   *regexp.Regexp
-	internalBodyRegexp   string
+	ExpectedBody       string `mapstructure:"expected_body"`
+	bodyRegexp         *regexp.Regexp
+	internalBodyRegexp string
 }
 
 func (monitor *HTTPMonitor) setBodyRegexp(errs []string) {
-	monitor.internalBodyRegexp = monitor.ExpectedBody;
+	monitor.internalBodyRegexp = monitor.ExpectedBody
 	monitor.bodyRegexp = nil
 
 	if len(monitor.internalBodyRegexp) > 0 {
@@ -75,14 +75,14 @@ func (monitor *HTTPMonitor) test(l *logrus.Entry) bool {
 	req.Header.Set("User-Agent", "Cachet-Monitor")
 
 	client := &http.Client{
-		Timeout:   time.Duration(monitor.Timeout * time.Second),
+		Timeout: time.Duration(monitor.Timeout * time.Second),
 		Transport: &http.Transport{
-	                TLSClientConfig: &tls.Config{
-	                        InsecureSkipVerify: (! monitor.Strict),
-	                },
-		 },
+			TLSClientConfig: &tls.Config{
+				InsecureSkipVerify: (!monitor.Strict),
+			},
+		},
 	}
-	l.Debugf("InsecureSkipVerify: %t", (! monitor.Strict))
+	l.Debugf("InsecureSkipVerify: %t", (!monitor.Strict))
 
 	resp, err := client.Do(req)
 	if err != nil {
@@ -140,12 +140,12 @@ func (mon *HTTPMonitor) Validate() []string {
 
 	mon.Method = strings.ToUpper(mon.Method)
 	switch mon.Method {
-		case "GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "HEAD":
-			break
-		case "":
-			mon.Method = "GET"
-		default:
-			errs = append(errs, "Unsupported HTTP method: "+mon.Method)
+	case "GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "HEAD":
+		break
+	case "":
+		mon.Method = "GET"
+	default:
+		errs = append(errs, "Unsupported HTTP method: "+mon.Method)
 	}
 
 	return errs
@@ -154,7 +154,7 @@ func (mon *HTTPMonitor) Validate() []string {
 func (mon *HTTPMonitor) Describe() []string {
 	features := mon.AbstractMonitor.Describe()
 	features = append(features, "Method: "+mon.Method)
-	features = append(features, "Insecure: "+ strconv.FormatBool(!mon.Strict))
+	features = append(features, "Insecure: "+strconv.FormatBool(!mon.Strict))
 
 	return features
 }

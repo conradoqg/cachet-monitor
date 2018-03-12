@@ -22,18 +22,18 @@ type Incident struct {
 // Send - Create or Update incident
 func (incident *Incident) Send(cfg *CachetMonitor) error {
 	switch incident.Status {
-		case 1, 2, 3:
-			// partial outage
-			incident.ComponentStatus = 3
+	case 1, 2, 3:
+		// partial outage
+		incident.ComponentStatus = 3
 
-			compInfo := cfg.API.GetComponentData(incident.ComponentID)
-			if compInfo.Status == 3 {
-				// major outage
-				incident.ComponentStatus = 4
-			}
-		case 4:
-			// fixed
-			incident.ComponentStatus = 1
+		compInfo := cfg.API.GetComponentData(incident.ComponentID)
+		if compInfo.Status == 3 {
+			// major outage
+			incident.ComponentStatus = 4
+		}
+	case 4:
+		// fixed
+		incident.ComponentStatus = 1
 	}
 
 	requestType := "POST"

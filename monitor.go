@@ -1,10 +1,13 @@
 package cachet
 
 import (
+	"bytes"
+	"net/http"
+	"os/exec"
+	"runtime"
+	"strconv"
 	"sync"
 	"time"
-	"strconv"
-	"os/exec"
 
 	"github.com/Sirupsen/logrus"
 )
@@ -28,8 +31,8 @@ type MonitorInterface interface {
 
 // AbstractMonitor data model
 type AbstractMonitor struct {
-	Name   string
-	Target string
+	Name    string
+	Target  string
 	Enabled bool
 
 	// (default)http / dns
@@ -38,21 +41,33 @@ type AbstractMonitor struct {
 
 	Interval time.Duration
 	Timeout  time.Duration
-	Resync  int
+	Resync   int
 
 	MetricID    int `mapstructure:"metric_id"`
 	ComponentID int `mapstructure:"component_id"`
 
 	// Metric stuff
 	Metrics struct {
-		ResponseTime []int	`mapstructure:"response_time"`
-		Availability []int	`mapstructure:"availability"`
-		IncidentCount []int	`mapstructure:"incident_count"`
+		ResponseTime  []int `mapstructure:"response_time"`
+		Availability  []int `mapstructure:"availability"`
+		IncidentCount []int `mapstructure:"incident_count"`
 	}
 
 	// ShellHook stuff
-	ShellHookOnSuccess string	`mapstructure:"on_success"`
-	ShellHookOnFailure string	`mapstructure:"on_failure"`
+	ShellHookOnSuccess string `mapstructure:"on_success"`
+	ShellHookOnFailure string `mapstructure:"on_failure"`
+
+	WebhookOnCritical struct {
+		Investigating MessageTemplate
+		Content_Type  string `mapstructure:"content_type"`
+		URL           string `mapstructure:"url"`
+	}
+
+	WebhookOnPartial struct {
+		Investigating MessageTemplate
+		Content_Type  string `mapstructure:"content_type"`
+		URL           string `mapstructure:"url"`
+	}
 
 	// Templating stuff
 	Template struct {
@@ -61,7 +76,7 @@ type AbstractMonitor struct {
 	}
 
 	// Threshold = percentage / number of down incidents
-	HistorySize      int `mapstructure:"history_size"`
+	HistorySize int `mapstructure:"history_size"`
 
 	Threshold      int
 	ThresholdCount int `mapstructure:"threshold_count"`
@@ -76,9 +91,9 @@ type AbstractMonitor struct {
 	// PerformanceThreshold sets the % limit above which this monitor will trigger degraded-performance
 	// PerformanceThreshold float32
 
-	resyncMod	int
-	currentStatus	int
-	history []bool
+	resyncMod     int
+	currentStatus int
+	history       []bool
 	// lagHistory     []float32
 	lastFailReason string
 	incident       *Incident
@@ -148,6 +163,12 @@ func (mon *AbstractMonitor) Validate() []string {
 	if err := mon.Template.Investigating.Compile(); err != nil {
 		errs = append(errs, "Could not compile \"investigating\" template: "+err.Error())
 	}
+	if err := mon.WebhookOnPartial.Investigating.Compile(); err != nil {
+		errs = append(errs, "Could not compile \"investigating\" template: "+err.Error())
+	}
+	if err := mon.WebhookOnCritical.Investigating.Compile(); err != nil {
+		errs = append(errs, "Could not compile \"investigating\" template: "+err.Error())
+	}
 
 	return errs
 }
@@ -169,7 +190,7 @@ func (mon *AbstractMonitor) Describe() []string {
 	features = append(features, "Incident count metrics: "+strconv.Itoa(len(mon.Metrics.IncidentCount)))
 	features = append(features, "Response time metrics: "+strconv.Itoa(len(mon.Metrics.ResponseTime)))
 	if mon.Resync > 0 {
-		features = append(features, "Resyncs cycle: " + strconv.Itoa(mon.Resync))
+		features = append(features, "Resyncs cycle: "+strconv.Itoa(mon.Resync))
 	}
 	if len(mon.ShellHookOnSuccess) > 0 {
 		features = append(features, "Has a 'on_success' shellhook")
@@ -214,7 +235,7 @@ func (mon *AbstractMonitor) ReloadCachetData() {
 	mon.currentStatus = compInfo.Status
 	mon.Enabled = compInfo.Enabled
 
-	mon.incident,_ = compInfo.LoadCurrentIncident(mon.config)
+	mon.incident, _ = compInfo.LoadCurrentIncident(mon.config)
 
 	if mon.incident != nil {
 		logrus.Infof("Current incident ID: %v", mon.incident.ID)
@@ -249,8 +270,8 @@ func (mon *AbstractMonitor) triggerShellHook(l *logrus.Entry, hooktype string, h
 
 	out, err := exec.Command(hook, mon.Name, strconv.Itoa(mon.ComponentID), mon.Target, hooktype, data).Output()
 	if err != nil {
-	    l.Warnf("Error when processing shellhook '%s': %s", hooktype, err)
-	    l.Warnf("Command output: %s", out)
+		l.Warnf("Error when processing shellhook '%s': %s", hooktype, err)
+		l.Warnf("Command output: %s", out)
 	}
 }
 
@@ -299,9 +320,9 @@ func (mon *AbstractMonitor) isCritical() bool {
 func (mon *AbstractMonitor) test(l *logrus.Entry) bool { return false }
 
 func (mon *AbstractMonitor) tick(iface MonitorInterface) {
-	l := logrus.WithFields(logrus.Fields{ "monitor": mon.Name })
+	l := logrus.WithFields(logrus.Fields{"monitor": mon.Name})
 
-	if(! mon.Enabled) {
+	if !mon.Enabled {
 		l.Printf("monitor is disabled")
 		return
 	}
@@ -310,6 +331,10 @@ func (mon *AbstractMonitor) tick(iface MonitorInterface) {
 	isUp := true
 	isUp = iface.test(l)
 	lag := getMs() - reqStart
+
+	if runtime.GOOS == "windows" {
+		lag = lag / 100
+	}
 
 	if len(mon.history) == mon.HistorySize-1 {
 		l.Debugf("monitor %v is now fully operational", mon.Name)
@@ -323,7 +348,7 @@ func (mon *AbstractMonitor) tick(iface MonitorInterface) {
 	mon.AnalyseData(l)
 
 	// Will trigger shellhook 'on_failure' as this isn't done in implementations
-	if ! isUp {
+	if !isUp {
 		mon.triggerShellHook(l, "on_failure", mon.ShellHookOnFailure, "")
 	}
 
@@ -333,9 +358,9 @@ func (mon *AbstractMonitor) tick(iface MonitorInterface) {
 	}
 	go mon.config.API.SendMetrics(l, "response time", mon.Metrics.ResponseTime, lag)
 
-	if(mon.Resync > 0) {
-		mon.resyncMod = (mon.resyncMod+1) % mon.Resync
-		if(mon.resyncMod == 0) {
+	if mon.Resync > 0 {
+		mon.resyncMod = (mon.resyncMod + 1) % mon.Resync
+		if mon.resyncMod == 0 {
 			l.Debugf("Reloading component's data")
 			mon.ReloadCachetData()
 		} else {
@@ -388,7 +413,7 @@ func (mon *AbstractMonitor) AnalyseData(l *logrus.Entry) {
 					criticalTriggered = (int(t) > mon.CriticalThreshold)
 				}
 			}
-			if ! criticalTriggered {
+			if !criticalTriggered {
 				if mon.PartialThresholdCount > 0 || mon.PartialThreshold > 0 {
 					partialTriggered = (mon.PartialThresholdCount > 0 && numDown >= mon.PartialThresholdCount) || (mon.PartialThreshold > 0 && int(t) > mon.PartialThreshold)
 				}
@@ -422,10 +447,10 @@ func (mon *AbstractMonitor) AnalyseData(l *logrus.Entry) {
 					incidentForceComponentStatus = 3
 				}
 				mon.incident = &Incident{
-					Name:        subject,
-					ComponentID: mon.ComponentID,
-					Message:     message,
-					Notify:      true,
+					Name:            subject,
+					ComponentID:     mon.ComponentID,
+					Message:         message,
+					Notify:          true,
 					ComponentStatus: incidentForceComponentStatus,
 				}
 
@@ -433,18 +458,56 @@ func (mon *AbstractMonitor) AnalyseData(l *logrus.Entry) {
 				l.Warnf("creating incident. Monitor is down: %v", mon.lastFailReason)
 				// set investigating status
 				mon.incident.SetInvestigating()
-				// create incident 
+				// create incident
 				if err := mon.incident.Send(mon.config); err != nil {
 					l.Printf("Error sending incident: %v", err)
 				}
+
+				// call webhook
+
+				if partialTriggered && len(mon.WebhookOnPartial.URL) > 0 {
+					l.Debugf("Calling OnPartial webhook")
+
+					message := mon.WebhookOnPartial.Investigating.ExecMessage(tplData)
+
+					url := mon.WebhookOnPartial.URL
+
+					req, err := http.NewRequest("POST", url, bytes.NewBuffer([]byte(message)))
+					req.Header.Set("Content-Type", mon.WebhookOnPartial.Content_Type)
+
+					client := &http.Client{}
+					resp, err := client.Do(req)
+					if err != nil {
+						l.Printf("Error calling webhook: %v", err)
+					}
+					defer resp.Body.Close()
+				}
+
+				if criticalTriggered && len(mon.WebhookOnCritical.URL) > 0 {
+					l.Debugf("Calling OnCritical webhook")
+
+					message := mon.WebhookOnCritical.Investigating.ExecMessage(tplData)
+
+					url := mon.WebhookOnCritical.URL
+
+					req, err := http.NewRequest("POST", url, bytes.NewBuffer([]byte(message)))
+					req.Header.Set("Content-Type", mon.WebhookOnCritical.Content_Type)
+
+					client := &http.Client{}
+					resp, err := client.Do(req)
+					if err != nil {
+						l.Printf("Error calling webhook: %v", err)
+					}
+					defer resp.Body.Close()
+				}
 			}
 			if triggered || criticalTriggered {
-				if (! mon.isCritical()) {
+				if !mon.isCritical() {
 					mon.config.API.SetComponentStatus(mon, 4)
 				}
 			}
 			if partialTriggered {
-				if (! mon.isPartial()) {
+				if !mon.isPartial() {
 					mon.config.API.SetComponentStatus(mon, 3)
 				}
 			}
@@ -455,7 +518,7 @@ func (mon *AbstractMonitor) AnalyseData(l *logrus.Entry) {
 	// we are up to normal
 
 	// global status seems incorrect though we couldn't fid any prior incident
-	if ! mon.isUp() && mon.incident == nil {
+	if !mon.isUp() && mon.incident == nil {
 		l.Info("Reseting component's status")
 		mon.lastFailReason = ""
 		mon.incident = nil

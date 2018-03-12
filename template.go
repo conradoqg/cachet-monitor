@@ -37,6 +37,10 @@ func (t *MessageTemplate) Compile() error {
 	return err
 }
 
+func (t *MessageTemplate) ExecMessage(data interface{}) string {
+	return t.exec(t.messageTpl, data)
+}
+
 func (t *MessageTemplate) Exec(data interface{}) (string, string) {
 	return t.exec(t.subjectTpl, data), t.exec(t.messageTpl, data)
 }
