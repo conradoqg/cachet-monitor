@@ -332,6 +332,10 @@ func (mon *AbstractMonitor) tick(iface MonitorInterface) {
 	isUp = iface.test(l)
 	lag := getMs() - reqStart
 
+	if !isUp {
+		lag = 0
+	}
+
 	if runtime.GOOS == "windows" {
 		lag = lag / 100
 	}

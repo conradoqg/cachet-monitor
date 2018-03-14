@@ -1,0 +1,8 @@
+FROM golang
+
+ADD . /go/src/github.com/conradoqg/cachet-monitor
+RUN go get ./...
+
+VOLUME /data
+
+ENTRYPOINT /go/bin/cachet-monitor -c /data/config.yml
