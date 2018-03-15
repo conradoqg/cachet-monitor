@@ -68,7 +68,7 @@ func getHostname() string {
 }
 
 func getMs() int64 {
-	return time.Now().UnixNano() / int64(time.Millisecond)
+	return time.Now().UnixNano() / (int64(time.Millisecond) / int64(time.Nanosecond))
 }
 
 func GetMonitorType(t string) string {

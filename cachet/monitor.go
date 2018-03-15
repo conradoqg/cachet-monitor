@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"net/http"
 	"os/exec"
-	"runtime"
 	"strconv"
 	"sync"
 	"time"
@@ -133,24 +132,12 @@ func (mon *AbstractMonitor) Validate() []string {
 		mon.Threshold = 0
 	}
 
-	if mon.Threshold > 0 && mon.Threshold > mon.HistorySize {
-		mon.Threshold = mon.HistorySize
-	}
-
 	if mon.CriticalThreshold <= 0 {
 		mon.CriticalThreshold = 0
 	}
 
-	if mon.CriticalThreshold > 0 && mon.CriticalThreshold > mon.HistorySize {
-		mon.CriticalThreshold = mon.HistorySize
-	}
-
 	if mon.PartialThreshold <= 0 {
 		mon.PartialThreshold = 0
-	}
-
-	if mon.PartialThreshold > 0 && mon.PartialThreshold > mon.HistorySize {
-		mon.PartialThreshold = mon.HistorySize
 	}
 
 	if mon.Threshold == 0 && mon.CriticalThreshold == 0 && mon.PartialThreshold == 0 && mon.ThresholdCount == 0 && mon.CriticalThresholdCount == 0 && mon.PartialThresholdCount == 0 {
@@ -334,10 +321,6 @@ func (mon *AbstractMonitor) tick(iface MonitorInterface) {
 
 	if !isUp {
 		lag = 0
-	}
-
-	if runtime.GOOS == "windows" {
-		lag = lag / 100
 	}
 
 	if len(mon.history) == mon.HistorySize-1 {
