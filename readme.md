@@ -1,9 +1,9 @@
-![screenshot](https://castawaylabs.github.io/cachet-monitor/screenshot.png)
+![screenshot](https://conradoqg.github.io/cachet-monitor/screenshot.png)
 
 ## Features
 
 - [x] Creates & Resolves Incidents
-- [x] Posts monitor lag to cachet graphs
+- [x] Posts monitor lag, availability, incident count to cachet graphs
 - [x] HTTP Checks (body/status code)
 - [x] DNS Checks
 - [x] Updates Component to Partial Outage
@@ -12,7 +12,7 @@
 
 ## Example Configuration
 
-**Note:** configuration can be in json or yaml format. [`example.config.json`](https://github.com/CastawayLabs/cachet-monitor/blob/master/example.config.json), [`example.config.yaml`](https://github.com/CastawayLabs/cachet-monitor/blob/master/example.config.yml) files.
+**Note:** configuration can be in json or yaml format. [`example.config.json`](https://github.com/conradoqg/cachet-monitor/blob/master/example.config.json), [`example.config.yaml`](https://github.com/conradoqg/cachet-monitor/blob/master/example.config.yml) files.
 
 ```yaml
 api:
@@ -33,33 +33,56 @@ monitors:
     # HTTP method
     method: POST
     
-    # set to update component (either component_id or metric_id are required)
+    # set to update component (either component_id or metric_id/metrics are required)
     component_id: 1
-    # set to post lag to cachet metric (graph)
-    metric_id: 4
+    
+    # set to post to cachet metrics [ response_time_metric_id, availability_metric_id, incident_count_metric_id ] or metric_id: response_time_metric_id  (graph)
+    metrics:
+        response_time: [ 4, 5 ]
 
     # custom templates (see readme for details)
-    # leave empty for defaults
     template:
       investigating:
         subject: "{{ .Monitor.Name }} - {{ .SystemName }}"
         message: "{{ .Monitor.Name }} check **failed** (server time: {{ .now }})\n\n{{ .FailReason }}"
       fixed:
         subject: "I HAVE BEEN FIXED"
-    
-    # launch script depending on event (failed or successful check)
-    shellhook:
-        on_success: /fullpath/shellhook_onsuccess.sh
-        on_failure: /fullpath/shellhook_onfailure.sh
 
+    # launch script depending on event (failed or successful check)
+    shellhook:    
+      on_success: /fullpath/shellhook_onsuccess.sh
+      on_failure: /fullpath/shellhook_onfailure.sh
+
+    # webhook to be called when a partial occurs
+    webhook:
+      on_partial:
+        url: "http://www.site.com/webhook"
+        content_type: "text/plain"
+        investigating:        
+          message: "{{ .Monitor.Name }} check **failed** (server time: {{ .now }})\n\n{{ .FailReason }}"
+      on_critical:
+        url: "http://www.site.com/webhook"
+        content_type: "text/plain"
+        investigating:        
+          message: "{{ .Monitor.Name }} check **failed** (server time: {{ .now }})\n\n{{ .FailReason }}"
+    
     # seconds between checks
     interval: 1
     # seconds for timeout
     timeout: 1
-    # If % of downtime is over this threshold, open an incident
+
+    # resync component data every x check
+    resync: 60
+
+    # necessary ticks before saturation (before evaluating the downtime)
+    history_size: 10
+
+    # if % or (count: threshold_count) of downtime is over this threshold, open an incident
     threshold: 50
-    # If % of downtime is over this threshold, set component's status as "Major Outage"
+
+    # or if % or (count: threshold_critical_count/threshold_partial_count) of downtime is over partical/critical open an incident with the related incident level
     threshold_critical: 80
+    threshold_partial: 20
 
     # custom HTTP headers
     headers:
@@ -68,6 +91,22 @@ monitors:
     expected_status_code: 200
     # regex to match body
     expected_body: "P.*NG"
+
+  # mock monitor example
+  - name: mock
+    
+    # set to update component (either component_id or metric_id are required)
+    component_id: 3
+
+    # seconds between checks
+    interval: 1
+
+    type: mock
+
+    shellhook:
+        on_success: /fullpath/shellhook_onsuccess.sh
+        on_fail: /fullpath/shellhook_onfail.sh
+
   # dns monitor example
   - name: dns
     # fqdn
@@ -83,8 +122,6 @@ monitors:
     # custom DNS server (defaults to system)
     dns: 8.8.4.4:53
     answers:
-      # exact/regex check
-      - regex: [1-9] alt[1-9].aspmx.l.google.com.
       - exact: 10 aspmx2.googlemail.com.
       - exact: 1 aspmx.l.google.com.
       - exact: 10 aspmx3.googlemail.com.
@@ -92,7 +129,7 @@ monitors:
 
 ## Installation
 
-1. Download binary from [release page](https://github.com/CastawayLabs/cachet-monitor/releases)
+1. Download binary from [release page](https://github.com/conradoqg/cachet-monitor/releases)
 2. Create a configuration
 3. `cachet-monitor -c /etc/cachet-monitor.yaml`
 
@@ -131,7 +168,7 @@ Environment varaibles:
 
 ## Init script
 
-If your system is running systemd (like Debian, Ubuntu 16.04, Fedora or Archlinux) you can use the provided example file: [example.cachet-monitor.service](https://github.com/CastawayLabs/cachet-monitor/blob/master/example.cachet-monitor.service).
+If your system is running systemd (like Debian, Ubuntu 16.04, Fedora or Archlinux) you can use the provided example file: [example.cachet-monitor.service](https://github.com/conradoqg/cachet-monitor/blob/master/example.cachet-monitor.service).
 
 1. Simply put it in the right place with `cp example.cachet-monitor.service /etc/systemd/system/cachet-monitor.service`
 2. Then do a `systemctl daemon-reload` in your terminal to update Systemd configuration
@@ -139,16 +176,16 @@ If your system is running systemd (like Debian, Ubuntu 16.04, Fedora or Archlinu
 
 ## Templates
 
-This package makes use of [`text/template`](https://godoc.org/text/template). [Default HTTP template](https://github.com/CastawayLabs/cachet-monitor/blob/master/http.go#L14)
+This package makes use of [`text/template`](https://godoc.org/text/template). [Default HTTP template](https://github.com/conradoqg/cachet-monitor/blob/master/http.go#L14)
 
 The following variables are available:
 
-| Root objects  |
-| ------------- | -----------------
-| `.SystemName` | system name
-| `.API`        | `api` object from configuration
-| `.Monitor`    | `monitor` object from configuration
-| `.now`        | formatted date string
+| Root objects  | Description                         |
+| ------------- | -----------------	+| ------------- | ------------------------------------|
+| `.SystemName` | system name	+| `.SystemName` | system name                         | 
+| `.API`        | `api` object from configuration	+| `.API`        | `api` object from configuration     |
+| `.Monitor`    | `monitor` object from configuration	+| `.Monitor`    | `monitor` object from configuration |
+| `.now`        | formatted date string	+| `.now`        | formatted date string               |
 
 | Monitor variables  |
 | ------------------ |
@@ -172,7 +209,7 @@ This gives us power to have an army of geographically distributed loggers and re
 
 When using `cachet-monitor` as a package in another program, you should follow what `cli/main.go` does. It is important to call `Validate` on `CachetMonitor` and all the monitors inside.
 
-[API Documentation](https://godoc.org/github.com/CastawayLabs/cachet-monitor)
+[API Documentation](https://godoc.org/github.com/conradoqg/cachet-monitor/cachet)
 
 # Contributions welcome
 
@@ -185,24 +222,4 @@ We'll happily accept contributions for the following (non exhaustive list).
 
 ## License
 
-MIT License
-
-Copyright (c) 2016 Castaway Labs LLC
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+This project is licensed under the MIT License - see the [LICENSE.md](LICENSE.md) file for details

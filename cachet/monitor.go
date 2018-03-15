@@ -52,20 +52,23 @@ type AbstractMonitor struct {
 		IncidentCount []int `mapstructure:"incident_count"`
 	}
 
-	// ShellHook stuff
-	ShellHookOnSuccess string `mapstructure:"on_success"`
-	ShellHookOnFailure string `mapstructure:"on_failure"`
-
-	WebhookOnCritical struct {
-		Investigating MessageTemplate
-		Content_Type  string `mapstructure:"content_type"`
-		URL           string `mapstructure:"url"`
+	ShellHook struct {
+		// ShellHook stuff
+		OnSuccess string `mapstructure:"on_success"`
+		OnFailure string `mapstructure:"on_failure"`
 	}
 
-	WebhookOnPartial struct {
-		Investigating MessageTemplate
-		Content_Type  string `mapstructure:"content_type"`
-		URL           string `mapstructure:"url"`
+	Webhook struct {
+		OnCritical struct {
+			Investigating MessageTemplate
+			ContentType   string `mapstructure:"content_type"`
+			URL           string `mapstructure:"url"`
+		} `mapstructure:"on_critical"`
+		OnPartial struct {
+			Investigating MessageTemplate
+			ContentType   string `mapstructure:"content_type"`
+			URL           string `mapstructure:"url"`
+		} `mapstructure:"on_partial"`
 	}
 
 	// Templating stuff
@@ -150,10 +153,10 @@ func (mon *AbstractMonitor) Validate() []string {
 	if err := mon.Template.Investigating.Compile(); err != nil {
 		errs = append(errs, "Could not compile \"investigating\" template: "+err.Error())
 	}
-	if err := mon.WebhookOnPartial.Investigating.Compile(); err != nil {
+	if err := mon.Webhook.OnPartial.Investigating.Compile(); err != nil {
 		errs = append(errs, "Could not compile \"investigating\" template: "+err.Error())
 	}
-	if err := mon.WebhookOnCritical.Investigating.Compile(); err != nil {
+	if err := mon.Webhook.OnCritical.Investigating.Compile(); err != nil {
 		errs = append(errs, "Could not compile \"investigating\" template: "+err.Error())
 	}
 
@@ -179,10 +182,10 @@ func (mon *AbstractMonitor) Describe() []string {
 	if mon.Resync > 0 {
 		features = append(features, "Resyncs cycle: "+strconv.Itoa(mon.Resync))
 	}
-	if len(mon.ShellHookOnSuccess) > 0 {
+	if len(mon.ShellHook.OnSuccess) > 0 {
 		features = append(features, "Has a 'on_success' shellhook")
 	}
-	if len(mon.ShellHookOnFailure) > 0 {
+	if len(mon.ShellHook.OnFailure) > 0 {
 		features = append(features, "Has a 'on_failure' shellhook")
 	}
 
@@ -336,7 +339,7 @@ func (mon *AbstractMonitor) tick(iface MonitorInterface) {
 
 	// Will trigger shellhook 'on_failure' as this isn't done in implementations
 	if !isUp {
-		mon.triggerShellHook(l, "on_failure", mon.ShellHookOnFailure, "")
+		mon.triggerShellHook(l, "on_failure", mon.ShellHook.OnFailure, "")
 	}
 
 	// report lag
@@ -452,15 +455,15 @@ func (mon *AbstractMonitor) AnalyseData(l *logrus.Entry) {
 
 				// call webhook
 
-				if partialTriggered && len(mon.WebhookOnPartial.URL) > 0 {
+				if partialTriggered && len(mon.Webhook.OnPartial.URL) > 0 {
 					l.Debugf("Calling OnPartial webhook")
 
-					message := mon.WebhookOnPartial.Investigating.ExecMessage(tplData)
+					message := mon.Webhook.OnPartial.Investigating.ExecMessage(tplData)
 
-					url := mon.WebhookOnPartial.URL
+					url := mon.Webhook.OnPartial.URL
 
 					req, err := http.NewRequest("POST", url, bytes.NewBuffer([]byte(message)))
-					req.Header.Set("Content-Type", mon.WebhookOnPartial.Content_Type)
+					req.Header.Set("Content-Type", mon.Webhook.OnPartial.ContentType)
 
 					client := &http.Client{}
 					resp, err := client.Do(req)
@@ -470,15 +473,15 @@ func (mon *AbstractMonitor) AnalyseData(l *logrus.Entry) {
 					defer resp.Body.Close()
 				}
 
-				if criticalTriggered && len(mon.WebhookOnCritical.URL) > 0 {
+				if criticalTriggered && len(mon.Webhook.OnCritical.URL) > 0 {
 					l.Debugf("Calling OnCritical webhook")
 
-					message := mon.WebhookOnCritical.Investigating.ExecMessage(tplData)
+					message := mon.Webhook.OnCritical.Investigating.ExecMessage(tplData)
 
-					url := mon.WebhookOnCritical.URL
+					url := mon.Webhook.OnCritical.URL
 
 					req, err := http.NewRequest("POST", url, bytes.NewBuffer([]byte(message)))
-					req.Header.Set("Content-Type", mon.WebhookOnCritical.Content_Type)
+					req.Header.Set("Content-Type", mon.Webhook.OnCritical.ContentType)
 
 					client := &http.Client{}
 					resp, err := client.Do(req)

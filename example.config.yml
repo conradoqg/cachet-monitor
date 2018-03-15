@@ -16,19 +16,12 @@ monitors:
     # HTTP method
     method: POST
     
-    # set to update component (either component_id or metric_id are required)
+    # set to update component (either component_id or metric_id/metrics are required)
     component_id: 1
     
-    # set to post to cachet metric (graph)
+    # set to post to cachet metrics [ response_time_metric_id, availability_metric_id, incident_count_metric_id ] or metric_id: response_time_metric_id  (graph)
     metrics:
         response_time: [ 4, 5 ]
-
-    # set to post lag to cachet metric (graph) - obsolete
-    metric_id: 4
-
-    # launch script depending on event (failed or successful check)
-    on_success: /fullpath/shellhook_onsuccess.sh
-    on_failure: /fullpath/shellhook_onfailure.sh
 
     # custom templates (see readme for details)
     template:
@@ -37,6 +30,24 @@ monitors:
         message: "{{ .Monitor.Name }} check **failed** (server time: {{ .now }})\n\n{{ .FailReason }}"
       fixed:
         subject: "I HAVE BEEN FIXED"
+
+    # launch script depending on event (failed or successful check)
+    shellhook:    
+      on_success: /fullpath/shellhook_onsuccess.sh
+      on_failure: /fullpath/shellhook_onfailure.sh
+
+    # webhook to be called when a partial occurs
+    webhook:
+      on_partial:
+        url: "http://www.site.com/webhook"
+        content_type: "text/plain"
+        investigating:        
+          message: "{{ .Monitor.Name }} check **failed** (server time: {{ .now }})\n\n{{ .FailReason }}"
+      on_critical:
+        url: "http://www.site.com/webhook"
+        content_type: "text/plain"
+        investigating:        
+          message: "{{ .Monitor.Name }} check **failed** (server time: {{ .now }})\n\n{{ .FailReason }}"
     
     # seconds between checks
     interval: 1
@@ -46,9 +57,13 @@ monitors:
     # resync component data every x check
     resync: 60
 
-    # If % of downtime is over this threshold, open an incident
-    # threshold: 50
+    # necessary ticks before saturation (before evaluating the downtime)
     history_size: 10
+
+    # if % or (count: threshold_count) of downtime is over this threshold, open an incident
+    threshold: 50
+
+    # or if % or (count: threshold_critical_count/threshold_partial_count) of downtime is over partical/critical open an incident with the related incident level
     threshold_critical: 80
     threshold_partial: 20
 
@@ -73,6 +88,7 @@ monitors:
 
     shellhook:
         on_success: /fullpath/shellhook_onsuccess.sh
+        on_fail: /fullpath/shellhook_onfail.sh
 
   # dns monitor example
   - name: dns

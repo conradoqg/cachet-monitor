@@ -10,7 +10,7 @@ type MockMonitor struct {
 
 // TODO: test
 func (monitor *MockMonitor) test(l *logrus.Entry) bool {
-	monitor.triggerShellHook(l, "on_success", monitor.ShellHookOnSuccess, "")
+	monitor.triggerShellHook(l, "on_success", monitor.ShellHook.OnSuccess, "")
 
 	return true
 }

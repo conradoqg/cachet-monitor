@@ -92,7 +92,7 @@ func (monitor *DNSMonitor) test(l *logrus.Entry) bool {
 		}
 	}
 
-	monitor.triggerShellHook(l, "on_success", monitor.ShellHookOnSuccess, "")
+	monitor.triggerShellHook(l, "on_success", monitor.ShellHook.OnSuccess, "")
 
 	return true
 }
