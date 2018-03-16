@@ -92,21 +92,6 @@ monitors:
     # regex to match body
     expected_body: "P.*NG"
 
-  # mock monitor example
-  - name: mock
-    
-    # set to update component (either component_id or metric_id are required)
-    component_id: 3
-
-    # seconds between checks
-    interval: 1
-
-    type: mock
-
-    shellhook:
-        on_success: /fullpath/shellhook_onsuccess.sh
-        on_fail: /fullpath/shellhook_onfail.sh
-
   # dns monitor example
   - name: dns
     # fqdn
