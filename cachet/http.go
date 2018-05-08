@@ -36,6 +36,7 @@ type HTTPMonitor struct {
 	Method             string
 	ExpectedStatusCode int `mapstructure:"expected_status_code"`
 	Headers            map[string]string
+	Body               string
 
 	// compiled to Regexp
 	ExpectedBody       string `mapstructure:"expected_body"`
@@ -68,7 +69,7 @@ func (monitor *HTTPMonitor) setBodyRegexp(errs []string) {
 // TODO: test
 func (monitor *HTTPMonitor) test(l *logrus.Entry) bool {
 
-	req, err := http.NewRequest(monitor.Method, monitor.Target, nil)
+	req, err := http.NewRequest(monitor.Method, monitor.Target, strings.NewReader(monitor.Body))
 	for k, v := range monitor.Headers {
 		req.Header.Add(k, v)
 	}
@@ -111,7 +112,7 @@ func (monitor *HTTPMonitor) test(l *logrus.Entry) bool {
 		}
 		if !monitor.bodyRegexp.Match(responseBody) {
 			monitor.lastFailReason = "Unexpected body: " + string(responseBody) + ".\nExpected to match: " + monitor.internalBodyRegexp
-			l.Infof("HTTP response error: Unexpected body")
+			l.Infof("HTTP response error: Unexpected body: " + string(responseBody) + ".\nExpected to match: " + monitor.internalBodyRegexp)
 			return false
 		}
 	}

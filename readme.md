@@ -32,7 +32,9 @@ monitors:
     strict: true
     # HTTP method
     method: POST
-    
+    # Body to send
+    body: "{\"testDatabase\": true}"
+
     # set to update component (either component_id or metric_id/metrics are required)
     component_id: 1
     
