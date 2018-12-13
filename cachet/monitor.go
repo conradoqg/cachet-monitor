@@ -7,8 +7,8 @@ import (
 	"strconv"
 	"sync"
 	"time"
-
 	"github.com/Sirupsen/logrus"
+	"fmt"
 )
 
 const DefaultInterval = time.Second * 60
@@ -26,6 +26,28 @@ type MonitorInterface interface {
 	Validate() []string
 	GetMonitor() *AbstractMonitor
 	Describe() []string
+	//SetCron() string
+}
+
+
+type DefaultConfig struct {
+ 	
+	DefInterval int `json:"def_interval" yaml:"def_interval"`
+	DefTimeout int `json:"def_timeout" yaml:"def_timeout"`
+	DefHistory_size int `json:"def_history_size" yaml:"def_history_size"`
+	DefCriticalThreshold int `json:"def_threshold_critical" yaml:"def_threshold_critical"`
+	DefPartialThreshold int `json:"def_threshold_partial" yaml:"def_threshold_partial"`
+	DefExpectedStatus int  `json:"def_expected_status_code" yaml:"def_expected_status_code"`
+	
+	DefWebHook struct {
+		DefOnPartial struct {
+			Investigating MessageTemplate
+			ContentType string `json:"def_content_type" yaml:"def_content_type"`
+			URL string `json:"def_url" yaml:"def_url"`
+		} `json:"def_on_partial" yaml:"def_on_partial"`
+		
+	} `json:"def_webhook" yaml:"def_webhook"`
+	
 }
 
 // AbstractMonitor data model
@@ -89,6 +111,8 @@ type AbstractMonitor struct {
 	PartialThreshold      int `mapstructure:"threshold_partial"`
 	PartialThresholdCount int `mapstructure:"threshold_partial_count"`
 
+	DefInterval int `mapstructure:"def_interval"`
+
 	// lag / average(lagHistory) * 100 = percentage above average lag
 	// PerformanceThreshold sets the % limit above which this monitor will trigger degraded-performance
 	// PerformanceThreshold float32
@@ -108,6 +132,13 @@ type AbstractMonitor struct {
 func (mon *AbstractMonitor) Validate() []string {
 	errs := []string{}
 
+	if Mondef != nil {
+	
+		//Mondef.DefCriticalThreshold = 99
+		mon.CriticalThreshold = Mondef.DefCriticalThreshold
+		fmt.Println(Mondef)
+	}
+	
 	if len(mon.Name) == 0 {
 		errs = append(errs, "Name is required")
 	}
@@ -192,6 +223,7 @@ func (mon *AbstractMonitor) Describe() []string {
 	return features
 }
 
+
 func (mon *AbstractMonitor) ReloadCachetData() {
 	compInfo := mon.config.API.GetComponentData(mon.ComponentID)
 
@@ -221,7 +253,8 @@ func (mon *AbstractMonitor) ReloadCachetData() {
 			}
 		}
 	}
-
+	//logrus.Info("DADO: %d", mon.HistorySize)
+	
 	mon.currentStatus = compInfo.Status
 	mon.Enabled = compInfo.Enabled
 
@@ -238,8 +271,13 @@ func (mon *AbstractMonitor) Init(cfg *CachetMonitor) bool {
 	mon.config = cfg
 
 	IsValid := true
-
+	// logrus.Infof("ALTEREI AS PARADAS, %d",mon.HistorySize)
 	mon.ReloadCachetData()
+
+	// if mon.HistorySize == 0 {
+	// 	mon.HistorySize = 88
+	// }
+	
 
 	if mon.ComponentID == 0 {
 		logrus.Infof("ComponentID couldn't be retreived")

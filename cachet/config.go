@@ -10,19 +10,21 @@ import (
 )
 
 type CachetMonitor struct {
-	SystemName  string                   `json:"system_name" yaml:"system_name"`
-	DateFormat  string                   `json:"date_format" yaml:"date_format"`
-	API         CachetAPI                `json:"api"`
-	RawMonitors []map[string]interface{} `json:"monitors" yaml:"monitors"`
-
+	SystemName  string                   	`json:"system_name" yaml:"system_name"`
+	DateFormat	string                   	`json:"date_format" yaml:"date_format"`
+	API	CachetAPI                			`json:"api"`
+	RawMonitors	[]map[string]interface{} 	`json:"monitors" yaml:"monitors"`
+	Defconf	DefaultConfig					`yaml:"default_config"`	
 	Monitors  []MonitorInterface `json:"-" yaml:"-"`
 	Immediate bool               `json:"-" yaml:"-"`
 }
 
+var Mondef *DefaultConfig
+
 // Validate configuration
 func (cfg *CachetMonitor) Validate() bool {
 	valid := true
-
+	
 	if len(cfg.SystemName) == 0 {
 		// get hostname
 		cfg.SystemName = getHostname()
@@ -41,6 +43,8 @@ func (cfg *CachetMonitor) Validate() bool {
 		logrus.Warnf("No monitors defined!\nSee help for example configuration")
 		valid = false
 	}
+
+	Mondef = &cfg.Defconf
 
 	for index, monitor := range cfg.Monitors {
 		if errs := monitor.Validate(); len(errs) > 0 {
