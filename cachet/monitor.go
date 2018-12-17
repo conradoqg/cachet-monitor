@@ -2,19 +2,15 @@ package cachet
 
 import (
 	"bytes"
+	"fmt"
 	"net/http"
 	"os/exec"
 	"strconv"
 	"sync"
 	"time"
-	"github.com/Sirupsen/logrus"
-	"fmt"
-)
 
-const DefaultInterval = time.Second * 60
-const DefaultTimeout = time.Second
-const DefaultTimeFormat = "15:04:05 Jan 2 MST"
-const DefaultHistorySize = 10
+	"github.com/Sirupsen/logrus"
+)
 
 type MonitorInterface interface {
 	ClockStart(*CachetMonitor, MonitorInterface, *sync.WaitGroup)
@@ -27,27 +23,6 @@ type MonitorInterface interface {
 	GetMonitor() *AbstractMonitor
 	Describe() []string
 	//SetCron() string
-}
-
-
-type DefaultConfig struct {
- 	
-	DefInterval int `json:"def_interval" yaml:"def_interval"`
-	DefTimeout int `json:"def_timeout" yaml:"def_timeout"`
-	DefHistory_size int `json:"def_history_size" yaml:"def_history_size"`
-	DefCriticalThreshold int `json:"def_threshold_critical" yaml:"def_threshold_critical"`
-	DefPartialThreshold int `json:"def_threshold_partial" yaml:"def_threshold_partial"`
-	DefExpectedStatus int  `json:"def_expected_status_code" yaml:"def_expected_status_code"`
-	
-	DefWebHook struct {
-		DefOnPartial struct {
-			Investigating MessageTemplate
-			ContentType string `json:"def_content_type" yaml:"def_content_type"`
-			URL string `json:"def_url" yaml:"def_url"`
-		} `json:"def_on_partial" yaml:"def_on_partial"`
-		
-	} `json:"def_webhook" yaml:"def_webhook"`
-	
 }
 
 // AbstractMonitor data model
@@ -111,8 +86,6 @@ type AbstractMonitor struct {
 	PartialThreshold      int `mapstructure:"threshold_partial"`
 	PartialThresholdCount int `mapstructure:"threshold_partial_count"`
 
-	DefInterval int `mapstructure:"def_interval"`
-
 	// lag / average(lagHistory) * 100 = percentage above average lag
 	// PerformanceThreshold sets the % limit above which this monitor will trigger degraded-performance
 	// PerformanceThreshold float32
@@ -132,26 +105,22 @@ type AbstractMonitor struct {
 func (mon *AbstractMonitor) Validate() []string {
 	errs := []string{}
 
-	if Mondef != nil {
-	
-		//Mondef.DefCriticalThreshold = 99
-		mon.CriticalThreshold = Mondef.DefCriticalThreshold
-		fmt.Println(Mondef)
-	}
-	
 	if len(mon.Name) == 0 {
 		errs = append(errs, "Name is required")
 	}
 
-	if mon.Interval < 1 {
-		mon.Interval = DefaultInterval
+	if mon.Interval < time.Second {
+		mon.Interval = Mondef.GetDefInterval()
+
 	}
-	if mon.Timeout < 1 {
-		mon.Timeout = DefaultTimeout
+	//fmt.Println(mon.Interval)
+	if mon.Timeout < time.Second {
+		mon.Timeout = Mondef.GetDefTimeOut()
 	}
 
 	if mon.Timeout > mon.Interval {
 		errs = append(errs, "Timeout greater than interval")
+
 	}
 
 	if mon.ComponentID == 0 && mon.MetricID == 0 {
@@ -159,7 +128,7 @@ func (mon *AbstractMonitor) Validate() []string {
 	}
 
 	if mon.HistorySize <= 0 {
-		mon.HistorySize = DefaultHistorySize
+		mon.HistorySize = Mondef.GetDefHistorySize()
 	}
 
 	if mon.Threshold <= 0 {
@@ -167,16 +136,24 @@ func (mon *AbstractMonitor) Validate() []string {
 	}
 
 	if mon.CriticalThreshold <= 0 {
-		mon.CriticalThreshold = 0
+		mon.CriticalThreshold = Mondef.GetDefThresholdCritical()
 	}
 
 	if mon.PartialThreshold <= 0 {
-		mon.PartialThreshold = 0
+		mon.PartialThreshold = Mondef.GetDefThresholdPartial()
 	}
 
 	if mon.Threshold == 0 && mon.CriticalThreshold == 0 && mon.PartialThreshold == 0 && mon.ThresholdCount == 0 && mon.CriticalThresholdCount == 0 && mon.PartialThresholdCount == 0 {
 		mon.Threshold = 100
 	}
+
+	fmt.Println("--------------")
+	fmt.Println(mon.Timeout)
+	fmt.Println(mon.Interval)
+	fmt.Println(mon.CriticalThreshold)
+	fmt.Println(mon.PartialThreshold)
+	fmt.Println(mon.HistorySize)
+	fmt.Println("--------------")
 
 	if err := mon.Template.Fixed.Compile(); err != nil {
 		errs = append(errs, "Could not compile \"fixed\" template: "+err.Error())
@@ -223,7 +200,6 @@ func (mon *AbstractMonitor) Describe() []string {
 	return features
 }
 
-
 func (mon *AbstractMonitor) ReloadCachetData() {
 	compInfo := mon.config.API.GetComponentData(mon.ComponentID)
 
@@ -254,7 +230,7 @@ func (mon *AbstractMonitor) ReloadCachetData() {
 		}
 	}
 	//logrus.Info("DADO: %d", mon.HistorySize)
-	
+
 	mon.currentStatus = compInfo.Status
 	mon.Enabled = compInfo.Enabled
 
@@ -277,7 +253,6 @@ func (mon *AbstractMonitor) Init(cfg *CachetMonitor) bool {
 	// if mon.HistorySize == 0 {
 	// 	mon.HistorySize = 88
 	// }
-	
 
 	if mon.ComponentID == 0 {
 		logrus.Infof("ComponentID couldn't be retreived")

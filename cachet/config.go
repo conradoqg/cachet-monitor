@@ -10,13 +10,13 @@ import (
 )
 
 type CachetMonitor struct {
-	SystemName  string                   	`json:"system_name" yaml:"system_name"`
-	DateFormat	string                   	`json:"date_format" yaml:"date_format"`
-	API	CachetAPI                			`json:"api"`
-	RawMonitors	[]map[string]interface{} 	`json:"monitors" yaml:"monitors"`
-	Defconf	DefaultConfig					`yaml:"default_config"`	
-	Monitors  []MonitorInterface `json:"-" yaml:"-"`
-	Immediate bool               `json:"-" yaml:"-"`
+	SystemName  string                   `json:"system_name" yaml:"system_name"`
+	DateFormat  string                   `json:"date_format" yaml:"date_format"`
+	API         CachetAPI                `json:"api"`
+	Defconf     DefaultConfig            `json:"default_config" yaml:"default_config"`
+	RawMonitors []map[string]interface{} `json:"monitors" yaml:"monitors"`
+	Monitors    []MonitorInterface       `json:"-" yaml:"-"`
+	Immediate   bool                     `json:"-" yaml:"-"`
 }
 
 var Mondef *DefaultConfig
@@ -24,7 +24,7 @@ var Mondef *DefaultConfig
 // Validate configuration
 func (cfg *CachetMonitor) Validate() bool {
 	valid := true
-	
+
 	if len(cfg.SystemName) == 0 {
 		// get hostname
 		cfg.SystemName = getHostname()

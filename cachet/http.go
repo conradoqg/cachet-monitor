@@ -133,6 +133,10 @@ func (mon *HTTPMonitor) Validate() []string {
 		errs = append(errs, "'Target' has not been set")
 	}
 
+	if mon.ExpectedStatusCode <= 0 {
+		mon.ExpectedStatusCode = Mondef.GetExpectedStatusCode()
+	}
+
 	if len(mon.ExpectedBody) == 0 && mon.ExpectedStatusCode == 0 {
 		errs = append(errs, "Both 'expected_body' and 'expected_status_code' fields empty")
 	}
