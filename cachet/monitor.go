@@ -2,7 +2,6 @@ package cachet
 
 import (
 	"bytes"
-	"fmt"
 	"net/http"
 	"os/exec"
 	"strconv"
@@ -113,7 +112,7 @@ func (mon *AbstractMonitor) Validate() []string {
 		mon.Interval = Mondef.GetDefInterval()
 
 	}
-	//fmt.Println(mon.Interval)
+
 	if mon.Timeout < time.Second {
 		mon.Timeout = Mondef.GetDefTimeOut()
 	}
@@ -136,24 +135,56 @@ func (mon *AbstractMonitor) Validate() []string {
 	}
 
 	if mon.CriticalThreshold <= 0 {
-		mon.CriticalThreshold = Mondef.GetDefThresholdCritical()
+		mon.CriticalThreshold = Mondef.GetDefTholdCritical()
 	}
 
 	if mon.PartialThreshold <= 0 {
-		mon.PartialThreshold = Mondef.GetDefThresholdPartial()
+		mon.PartialThreshold = Mondef.GetDefTholdPartial()
 	}
 
 	if mon.Threshold == 0 && mon.CriticalThreshold == 0 && mon.PartialThreshold == 0 && mon.ThresholdCount == 0 && mon.CriticalThresholdCount == 0 && mon.PartialThresholdCount == 0 {
 		mon.Threshold = 100
 	}
 
-	fmt.Println("--------------")
-	fmt.Println(mon.Timeout)
-	fmt.Println(mon.Interval)
-	fmt.Println(mon.CriticalThreshold)
-	fmt.Println(mon.PartialThreshold)
-	fmt.Println(mon.HistorySize)
-	fmt.Println("--------------")
+	if len(mon.Webhook.OnCritical.ContentType) == 0 {
+		mon.Webhook.OnCritical.ContentType = Mondef.GetWCritContent()
+	}
+
+	if len(mon.Webhook.OnCritical.URL) == 0 {
+		mon.Webhook.OnCritical.URL = Mondef.GetWCritUrl()
+	}
+
+	if len(mon.Webhook.OnCritical.Investigating.Message) == 0 {
+		mon.Webhook.OnCritical.Investigating.Message = Mondef.GetWCritMessage()
+	}
+
+	if len(mon.Webhook.OnPartial.ContentType) == 0 {
+		mon.Webhook.OnPartial.ContentType = Mondef.GetWPartContent()
+	}
+
+	if len(mon.Webhook.OnPartial.URL) == 0 {
+		mon.Webhook.OnPartial.URL = Mondef.GetWPartUrl()
+	}
+
+	if len(mon.Webhook.OnPartial.Investigating.Message) == 0 {
+		mon.Webhook.OnPartial.Investigating.Message = Mondef.GetWPartMessage()
+	}
+
+	if mon.Template.Investigating.Subject == defaultHTTPInvestigatingTpl.Subject {
+		mon.Template.Investigating.Subject = Mondef.GetTempInvSub(defaultHTTPInvestigatingTpl.Subject)
+	}
+
+	if mon.Template.Investigating.Message == defaultHTTPInvestigatingTpl.Message {
+		mon.Template.Investigating.Message = Mondef.GetTempInvMes(defaultHTTPInvestigatingTpl.Message)
+	}
+
+	if mon.Template.Fixed.Subject == defaultHTTPFixedTpl.Subject {
+		mon.Template.Fixed.Subject = Mondef.GetTempFixSub(defaultHTTPFixedTpl.Subject)
+	}
+
+	if mon.Template.Fixed.Message == defaultHTTPFixedTpl.Message {
+		mon.Template.Fixed.Message = Mondef.GetTempFixMes(defaultHTTPFixedTpl.Message)
+	}
 
 	if err := mon.Template.Fixed.Compile(); err != nil {
 		errs = append(errs, "Could not compile \"fixed\" template: "+err.Error())

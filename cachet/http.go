@@ -134,7 +134,7 @@ func (mon *HTTPMonitor) Validate() []string {
 	}
 
 	if mon.ExpectedStatusCode <= 0 {
-		mon.ExpectedStatusCode = Mondef.GetExpectedStatusCode()
+		mon.ExpectedStatusCode = Mondef.GetExpStsCode()
 	}
 
 	if len(mon.ExpectedBody) == 0 && mon.ExpectedStatusCode == 0 {
