@@ -11,11 +11,6 @@ import (
 	"github.com/Sirupsen/logrus"
 )
 
-const DefaultInterval = time.Second * 60
-const DefaultTimeout = time.Second
-const DefaultTimeFormat = "15:04:05 Jan 2 MST"
-const DefaultHistorySize = 10
-
 type MonitorInterface interface {
 	ClockStart(*CachetMonitor, MonitorInterface, *sync.WaitGroup)
 	ClockStop()
@@ -26,6 +21,7 @@ type MonitorInterface interface {
 	Validate() []string
 	GetMonitor() *AbstractMonitor
 	Describe() []string
+	//SetCron() string
 }
 
 // AbstractMonitor data model
@@ -112,15 +108,18 @@ func (mon *AbstractMonitor) Validate() []string {
 		errs = append(errs, "Name is required")
 	}
 
-	if mon.Interval < 1 {
-		mon.Interval = DefaultInterval
+	if mon.Interval < time.Second {
+		mon.Interval = Mondef.GetDefInterval()
+
 	}
-	if mon.Timeout < 1 {
-		mon.Timeout = DefaultTimeout
+
+	if mon.Timeout < time.Second {
+		mon.Timeout = Mondef.GetDefTimeOut()
 	}
 
 	if mon.Timeout > mon.Interval {
 		errs = append(errs, "Timeout greater than interval")
+
 	}
 
 	if mon.ComponentID == 0 && mon.MetricID == 0 {
@@ -128,7 +127,7 @@ func (mon *AbstractMonitor) Validate() []string {
 	}
 
 	if mon.HistorySize <= 0 {
-		mon.HistorySize = DefaultHistorySize
+		mon.HistorySize = Mondef.GetDefHistorySize()
 	}
 
 	if mon.Threshold <= 0 {
@@ -136,15 +135,55 @@ func (mon *AbstractMonitor) Validate() []string {
 	}
 
 	if mon.CriticalThreshold <= 0 {
-		mon.CriticalThreshold = 0
+		mon.CriticalThreshold = Mondef.GetDefTholdCritical()
 	}
 
 	if mon.PartialThreshold <= 0 {
-		mon.PartialThreshold = 0
+		mon.PartialThreshold = Mondef.GetDefTholdPartial()
 	}
 
 	if mon.Threshold == 0 && mon.CriticalThreshold == 0 && mon.PartialThreshold == 0 && mon.ThresholdCount == 0 && mon.CriticalThresholdCount == 0 && mon.PartialThresholdCount == 0 {
 		mon.Threshold = 100
+	}
+
+	if len(mon.Webhook.OnCritical.ContentType) == 0 {
+		mon.Webhook.OnCritical.ContentType = Mondef.GetWCritContent()
+	}
+
+	if len(mon.Webhook.OnCritical.URL) == 0 {
+		mon.Webhook.OnCritical.URL = Mondef.GetWCritUrl()
+	}
+
+	if len(mon.Webhook.OnCritical.Investigating.Message) == 0 {
+		mon.Webhook.OnCritical.Investigating.Message = Mondef.GetWCritMessage()
+	}
+
+	if len(mon.Webhook.OnPartial.ContentType) == 0 {
+		mon.Webhook.OnPartial.ContentType = Mondef.GetWPartContent()
+	}
+
+	if len(mon.Webhook.OnPartial.URL) == 0 {
+		mon.Webhook.OnPartial.URL = Mondef.GetWPartUrl()
+	}
+
+	if len(mon.Webhook.OnPartial.Investigating.Message) == 0 {
+		mon.Webhook.OnPartial.Investigating.Message = Mondef.GetWPartMessage()
+	}
+
+	if mon.Template.Investigating.Subject == defaultHTTPInvestigatingTpl.Subject {
+		mon.Template.Investigating.Subject = Mondef.GetTempInvSub(defaultHTTPInvestigatingTpl.Subject)
+	}
+
+	if mon.Template.Investigating.Message == defaultHTTPInvestigatingTpl.Message {
+		mon.Template.Investigating.Message = Mondef.GetTempInvMes(defaultHTTPInvestigatingTpl.Message)
+	}
+
+	if mon.Template.Fixed.Subject == defaultHTTPFixedTpl.Subject {
+		mon.Template.Fixed.Subject = Mondef.GetTempFixSub(defaultHTTPFixedTpl.Subject)
+	}
+
+	if mon.Template.Fixed.Message == defaultHTTPFixedTpl.Message {
+		mon.Template.Fixed.Message = Mondef.GetTempFixMes(defaultHTTPFixedTpl.Message)
 	}
 
 	if err := mon.Template.Fixed.Compile(); err != nil {
@@ -221,6 +260,7 @@ func (mon *AbstractMonitor) ReloadCachetData() {
 			}
 		}
 	}
+	//logrus.Info("DADO: %d", mon.HistorySize)
 
 	mon.currentStatus = compInfo.Status
 	mon.Enabled = compInfo.Enabled
@@ -238,8 +278,12 @@ func (mon *AbstractMonitor) Init(cfg *CachetMonitor) bool {
 	mon.config = cfg
 
 	IsValid := true
-
+	// logrus.Infof("ALTEREI AS PARADAS, %d",mon.HistorySize)
 	mon.ReloadCachetData()
+
+	// if mon.HistorySize == 0 {
+	// 	mon.HistorySize = 88
+	// }
 
 	if mon.ComponentID == 0 {
 		logrus.Infof("ComponentID couldn't be retreived")
