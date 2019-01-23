@@ -40,6 +40,7 @@ type AbstractMonitor struct {
 
 	MetricID    int `mapstructure:"metric_id"`
 	ComponentID int `mapstructure:"component_id"`
+	ConfigID    int `mapstructure:"config_id"`
 
 	// Metric stuff
 	Metrics struct {

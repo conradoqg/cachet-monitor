@@ -13,6 +13,36 @@ const DefaultTholdPart = 40
 const DefaultExpStsCode = 200
 const DefContentType = "text/plain"
 
+type ConfigsInterface interface {
+	GetGlobalConfigs() *AbstractConfigs
+}
+
+type AbstractConfigs struct {
+	Name              string
+	Id                int
+	Interval          time.Duration `mapstructure:"interval"`
+	Timeout           time.Duration `mapstructure:"timeout"`
+	HistorySize       int           `mapstructure:"history_size"`
+	ThresholdCritical int           `mapstructure:"threshold_critical"`
+	ThresholdPartial  int           `mapstructure:"threshold_partial"`
+	ExpectedStatus    int           `mapstructure:"expected_status_code"`
+
+	Webhook struct {
+		OnCritical struct {
+			Investigating MessageTemplate
+			ContentType   string `mapstructure:"content_type"`
+			URL           string `mapstructure:"url"`
+		} `mapstructure:"on_critical"`
+
+		OnPartial struct {
+			Investigating MessageTemplate
+			ContentType   string `mapstructure:"content_type"`
+			URL           string `mapstructure:"url"`
+		} `mapstructure:"on_partial"`
+	}
+}
+
+///---------------------------- generic configs
 type DefaultConfig struct {
 	DefInterval           int `json:"def_interval" yaml:"def_interval"`
 	DefTimeout            int `json:"def_timeout" yaml:"def_timeout"`
@@ -52,6 +82,10 @@ type DefaultConfig struct {
 			DefMessage string `yaml:"def_message"`
 		} `yaml:"def_fixed"`
 	} `yaml:"def_template"`
+}
+
+type GlobalConfigs struct {
+	AbstractConfigs `mapstructure:",squash"`
 }
 
 func (Def *DefaultConfig) GetDefInterval() time.Duration {
@@ -169,4 +203,8 @@ func (Def *DefaultConfig) GetTempFixMes(s string) string {
 	} else {
 		return Def.DefTemplate.DefFixed.DefMessage
 	}
+}
+
+func (conf *AbstractConfigs) GetGlobalConfigs() *AbstractConfigs {
+	return conf
 }

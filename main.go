@@ -200,8 +200,18 @@ func getConfiguration(path string) (*cachet.CachetMonitor, error) {
 	if err != nil {
 		logrus.Warnf("Unable to parse configuration file")
 	}
-
+	cfg.Configs = make([]cachet.ConfigsInterface, len(cfg.RawConfigs))
 	cfg.Monitors = make([]cachet.MonitorInterface, len(cfg.RawMonitors))
+
+	for index, rawConfigs := range cfg.RawConfigs {
+		var c cachet.ConfigsInterface
+		var g cachet.GlobalConfigs
+		err = mapstructure.Decode(rawConfigs, &g)
+		c = &g
+
+		cfg.Configs[index] = c
+	}
+
 	for index, rawMonitor := range cfg.RawMonitors {
 		var t cachet.MonitorInterface
 		var err error
@@ -217,6 +227,7 @@ func getConfiguration(path string) (*cachet.CachetMonitor, error) {
 			var s cachet.HTTPMonitor
 			err = mapstructure.Decode(rawMonitor, &s)
 			t = &s
+
 		case "dns":
 			var s cachet.DNSMonitor
 			err = mapstructure.Decode(rawMonitor, &s)
@@ -229,9 +240,23 @@ func getConfiguration(path string) (*cachet.CachetMonitor, error) {
 			logrus.Errorf("Invalid monitor type (index: %d) %v", index, monType)
 			continue
 		}
+		//load global configs
+		if t.GetMonitor().ConfigID > 0 {
+			for _, config := range cfg.Configs {
+				if config.GetGlobalConfigs().Id == t.GetMonitor().ConfigID {
+					t.GetMonitor().Interval = config.GetGlobalConfigs().Interval
+					t.GetMonitor().Timeout = config.GetGlobalConfigs().Timeout
+					t.GetMonitor().HistorySize = config.GetGlobalConfigs().HistorySize
+					t.GetMonitor().CriticalThreshold = config.GetGlobalConfigs().ThresholdCritical
+					t.GetMonitor().PartialThreshold = config.GetGlobalConfigs().ThresholdPartial
+					t.GetMonitor().Webhook.OnCritical = config.GetGlobalConfigs().Webhook.OnCritical
+					t.GetMonitor().Webhook.OnPartial = config.GetGlobalConfigs().Webhook.OnPartial
+
+				}
+			}
+		}
 
 		t.GetMonitor().Type = monType
-
 		if err != nil {
 			logrus.Errorf("Unable to unmarshal monitor to type (index: %d): %v", index, err)
 			continue
