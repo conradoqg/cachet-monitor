@@ -15,7 +15,9 @@ type CachetMonitor struct {
 	API         CachetAPI                `json:"api"`
 	Defconf     DefaultConfig            `json:"default_config" yaml:"default_config"`
 	RawMonitors []map[string]interface{} `json:"monitors" yaml:"monitors"`
+	RawConfigs  []map[string]interface{} `json:"configs" yaml:"configs"`
 	Monitors    []MonitorInterface       `json:"-" yaml:"-"`
+	Configs     []ConfigsInterface       `json:"-" yaml:"-"`
 	Immediate   bool                     `json:"-" yaml:"-"`
 }
 
